@@ -90,7 +90,7 @@ function App() {
 
   // Navigation / Mode state
   const [activeMode, setActiveMode] = useState('image') // 'image' | 'manual'
-  const [backendOnline, setBackendOnline] = useState(true)
+  const [backendStatus, setBackendStatus] = useState('waking') // 'waking' | 'online' | 'unavailable'
 
   // Image Analysis states
   const [selectedFile, setSelectedFile] = useState(null)
@@ -190,28 +190,19 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Check backend server availability with cold-start retry
+  // Lightweight health check on frontend mount to pre-wake Render backend
   useEffect(() => {
-    let timerId = null
-    const checkBackend = () => {
-      fetch(BACKEND_URL)
-        .then((res) => {
-          if (res.ok) {
-            setBackendOnline(true)
-          } else {
-            setBackendOnline(false)
-            timerId = setTimeout(checkBackend, 10000)
-          }
-        })
-        .catch(() => {
-          setBackendOnline(false)
-          timerId = setTimeout(checkBackend, 10000)
-        })
-    }
-    checkBackend()
-    return () => {
-      if (timerId) clearTimeout(timerId)
-    }
+    fetch(BACKEND_URL, { method: 'GET' })
+      .then((res) => {
+        if (res.ok) {
+          setBackendStatus('online')
+        } else {
+          setBackendStatus('unavailable')
+        }
+      })
+      .catch(() => {
+        setBackendStatus('unavailable')
+      })
   }, [])
 
   // Clean up object URLs when preview changes or unmounts
@@ -362,7 +353,7 @@ function App() {
         prediction: result.prediction,
         confidence: formattedConfidence,
       })
-      setBackendOnline(true)
+      setBackendStatus('online')
 
       // Automatically add successful result to logged-in user's history
       const newRecord = {
@@ -385,10 +376,10 @@ function App() {
       console.error("Prediction error:", err)
       if (err.name === 'AbortError') {
         setImageError('Request timed out. The Render server took longer than 120 seconds to respond. Please click Analyze Image again as the server finishes waking up.')
-        setBackendOnline(false)
+        setBackendStatus('unavailable')
       } else if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
         setImageError('Unable to connect to FreshGuard AI backend at Render. The server may still be spinning up. Please wait a moment and try again.')
-        setBackendOnline(false)
+        setBackendStatus('unavailable')
       } else {
         setImageError(err.message || 'Prediction failed. Please try again with another image.')
       }
@@ -487,7 +478,7 @@ function App() {
       }
 
       setManualResult(data)
-      setBackendOnline(true)
+      setBackendStatus('online')
 
       // Automatically add successful result to logged-in user's history
       const newRecord = {
@@ -509,7 +500,7 @@ function App() {
     } catch (err) {
       if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
         setManualError('Unable to connect to FreshGuard AI. Please make sure the backend is running.')
-        setBackendOnline(false)
+        setBackendStatus('unavailable')
       } else {
         setManualError(err.message || 'Prediction failed. Please check your inputs and try again.')
       }
@@ -537,14 +528,52 @@ function App() {
                 FreshGuard <span>AI</span>
               </span>
             </div>
-            <div className="nav-badge" title={`Backend Server: ${BACKEND_URL}`}>
+            <div
+              className="nav-badge"
+              title={`Backend Server: ${BACKEND_URL}`}
+              style={{
+                background:
+                  backendStatus === 'online'
+                    ? '#ecfdf5'
+                    : backendStatus === 'waking'
+                    ? '#fffbeb'
+                    : '#fef2f2',
+                borderColor:
+                  backendStatus === 'online'
+                    ? '#a7f3d0'
+                    : backendStatus === 'waking'
+                    ? '#fde68a'
+                    : '#fecaca',
+                color:
+                  backendStatus === 'online'
+                    ? '#065f46'
+                    : backendStatus === 'waking'
+                    ? '#92400e'
+                    : '#991b1b',
+              }}
+            >
               <span
                 className="nav-badge-dot"
                 style={{
-                  backgroundColor: backendOnline ? '#10B981' : '#EF4444',
+                  backgroundColor:
+                    backendStatus === 'online'
+                      ? '#10B981'
+                      : backendStatus === 'waking'
+                      ? '#F59E0B'
+                      : '#EF4444',
+                  boxShadow:
+                    backendStatus === 'online'
+                      ? '0 0 0 2px rgba(16, 185, 129, 0.25)'
+                      : backendStatus === 'waking'
+                      ? '0 0 0 2px rgba(245, 158, 11, 0.25)'
+                      : '0 0 0 2px rgba(239, 68, 68, 0.25)',
                 }}
               ></span>
-              {backendOnline ? 'AI Model Online' : 'Server Offline'}
+              {backendStatus === 'online'
+                ? 'AI Backend Online'
+                : backendStatus === 'waking'
+                ? 'AI Backend Waking Up...'
+                : 'AI Backend Unavailable'}
             </div>
           </div>
         </header>
@@ -634,14 +663,52 @@ function App() {
                 </button>
               </li>
               <li>
-                <div className="nav-badge" title={`Backend Server: ${BACKEND_URL}`}>
+                <div
+                  className="nav-badge"
+                  title={`Backend Server: ${BACKEND_URL}`}
+                  style={{
+                    background:
+                      backendStatus === 'online'
+                        ? '#ecfdf5'
+                        : backendStatus === 'waking'
+                        ? '#fffbeb'
+                        : '#fef2f2',
+                    borderColor:
+                      backendStatus === 'online'
+                        ? '#a7f3d0'
+                        : backendStatus === 'waking'
+                        ? '#fde68a'
+                        : '#fecaca',
+                    color:
+                      backendStatus === 'online'
+                        ? '#065f46'
+                        : backendStatus === 'waking'
+                        ? '#92400e'
+                        : '#991b1b',
+                  }}
+                >
                   <span
                     className="nav-badge-dot"
                     style={{
-                      backgroundColor: backendOnline ? '#10B981' : '#EF4444',
+                      backgroundColor:
+                        backendStatus === 'online'
+                          ? '#10B981'
+                          : backendStatus === 'waking'
+                          ? '#F59E0B'
+                          : '#EF4444',
+                      boxShadow:
+                        backendStatus === 'online'
+                          ? '0 0 0 2px rgba(16, 185, 129, 0.25)'
+                          : backendStatus === 'waking'
+                          ? '0 0 0 2px rgba(245, 158, 11, 0.25)'
+                          : '0 0 0 2px rgba(239, 68, 68, 0.25)',
                     }}
                   ></span>
-                  {backendOnline ? 'AI Model Online' : 'Server Offline'}
+                  {backendStatus === 'online'
+                    ? 'AI Backend Online'
+                    : backendStatus === 'waking'
+                    ? 'AI Backend Waking Up...'
+                    : 'AI Backend Unavailable'}
                 </div>
               </li>
             </ul>

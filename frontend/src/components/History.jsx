@@ -10,8 +10,8 @@ function History({ history, onClearHistory, onStartAnalysis }) {
 
   // Summary statistics
   const totalScans = history.length
-  const goodCount = history.filter((item) => item.prediction === 'Good to Eat').length
-  const badCount = history.filter((item) => item.prediction !== 'Good to Eat').length
+  const goodCount = history.filter((item) => Boolean(item.prediction && item.prediction.trim().toLowerCase() === 'good to eat')).length
+  const badCount = history.filter((item) => !item.prediction || item.prediction.trim().toLowerCase() !== 'good to eat').length
 
   return (
     <div className="history-page">
@@ -101,7 +101,7 @@ function History({ history, onClearHistory, onStartAnalysis }) {
           <div className="history-records-container">
             <div className="history-cards-grid">
               {history.map((record) => {
-                const isPositive = record.prediction === 'Good to Eat'
+                const isPositive = Boolean(record.prediction && record.prediction.trim().toLowerCase() === 'good to eat')
                 return (
                   <div
                     key={record.id}

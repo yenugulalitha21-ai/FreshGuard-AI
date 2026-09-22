@@ -518,8 +518,8 @@ function App() {
     }
   }
 
-  const isImagePositive = imageResult && imageResult.prediction === 'Good to Eat'
-  const isManualPositive = manualResult && manualResult.prediction === 'Good to Eat'
+  const isImagePositive = Boolean(imageResult && imageResult.prediction && imageResult.prediction.trim().toLowerCase() === 'good to eat')
+  const isManualPositive = Boolean(manualResult && manualResult.prediction && manualResult.prediction.trim().toLowerCase() === 'good to eat')
 
   // If user is not logged in, render the professional Login page
   if (!currentUser) {

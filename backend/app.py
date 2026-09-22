@@ -12,7 +12,6 @@ os.environ["MALLOC_TRIM_THRESHOLD_"] = "65536"
 import gc
 import math
 import numpy as np
-import pandas as pd
 from PIL import Image
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -22,7 +21,6 @@ import tensorflow as tf
 tf.config.threading.set_intra_op_parallelism_threads(1)
 tf.config.threading.set_inter_op_parallelism_threads(1)
 
-import joblib
 from werkzeug.utils import secure_filename
 
 # Helper for Linux memory trim to prevent cgroup OOM on Render 512MB RAM
@@ -72,28 +70,24 @@ UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER', os.path.join(BASE_DIR, 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# 2. Load the trained models at startup
+# 2. Load the trained image model at startup (single model instance, compile=False for low-memory inference)
 print(f"Loading FreshGuard AI Image model from: {IMAGE_MODEL_PATH}")
-image_model = tf.keras.models.load_model(IMAGE_MODEL_PATH)
+image_model = tf.keras.models.load_model(IMAGE_MODEL_PATH, compile=False)
 print("Image model loaded successfully!")
-
-# Warm up image model at startup inside a function; free temporary tensors immediately
-def _warmup_model():
-    try:
-        dummy_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
-        _ = image_model(dummy_input, training=False)
-        del dummy_input, _
-        trim_memory()
-        print("FreshGuard AI Image model warmed up successfully!")
-    except Exception as e:
-        print(f"Image model warmup notice: {e}")
-
-_warmup_model()
-
-print(f"Loading FreshGuard AI Random Forest model from: {RF_MODEL_PATH}")
-rf_model = joblib.load(RF_MODEL_PATH)
-print("Random Forest model loaded successfully!")
 trim_memory()
+
+# Lazy loader for Random Forest model to save ~80MB RAM for image inference
+_rf_model = None
+
+
+def get_rf_model():
+    global _rf_model
+    if _rf_model is None:
+        import joblib
+        print(f"Loading FreshGuard AI Random Forest model from: {RF_MODEL_PATH}")
+        _rf_model = joblib.load(RF_MODEL_PATH)
+        print("Random Forest model loaded successfully!")
+    return _rf_model
 
 # Image model parameters
 IMAGE_SIZE = (224, 224)
@@ -282,15 +276,18 @@ def predict_manual():
             }), 400
 
     try:
+        import pandas as pd
+        rf = get_rf_model()
+
         # 4. Create Pandas DataFrame with exact columns in exact required order
         df_input = pd.DataFrame([clean_data], columns=REQUIRED_MANUAL_COLUMNS)
 
         # 5. Execute model prediction and probability calculation
-        raw_pred = rf_model.predict(df_input)[0]
-        probabilities = rf_model.predict_proba(df_input)[0]
+        raw_pred = rf.predict(df_input)[0]
+        probabilities = rf.predict_proba(df_input)[0]
 
         # 6. Map confidence to predicted class probability
-        classes_list = list(rf_model.classes_)
+        classes_list = list(rf.classes_)
         pred_idx = classes_list.index(raw_pred)
         confidence = round(float(probabilities[pred_idx]) * 100, 2)
 

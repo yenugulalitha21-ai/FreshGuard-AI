@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>FreshGuard AI</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="logo">FreshGuard AI</div>
+
+        <nav>
+            <a href="#home">Home</a>
+            <a href="#checker">Quality Checker</a>
+            <a href="#about">About</a>
+        </nav>
+    </header>
+
+
+    <!-- Home Section -->
+    <section id="home" class="hero">
+
+        <div class="hero-content">
+
+            <h1>FreshGuard AI</h1>
+
+            <h2>Fruit & Vegetable Quality Checker</h2>
+
+            <p>
+                Use AI to classify fruits and vegetables as
+                Good to Eat, Bad to Eat, or Artificial.
+            </p>
+
+            <button onclick="scrollToChecker()">
+                Check Quality
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <!-- Quality Checker -->
+    <section id="checker" class="checker-section">
+
+        <h2>Check Fruit / Vegetable Quality</h2>
+
+        <p class="description">
+            Upload an image or enter the quality information below.
+        </p>
+
+
+        <div class="checker-container">
+
+            <!-- Image Upload -->
+            <div class="input-card">
+
+                <h3>1. Upload Image</h3>
+
+                <input
+                    type="file"
+                    id="fruitImage"
+                    accept="image/*"
+                    onchange="previewImage(event)"
+                >
+
+                <div class="image-preview">
+
+                    <img
+                        id="preview"
+                        src=""
+                        alt="Image Preview"
+                    >
+
+                </div>
+
+            </div>
+
+
+            <!-- Quality Information -->
+            <div class="input-card">
+
+                <h3>2. Enter Quality Information</h3>
+
+
+                <label for="color">
+                    Color
+                </label>
+
+                <select id="color">
+
+                    <option value="">
+                        Select Color
+                    </option>
+
+                    <option value="Bright Green">
+                        Bright Green
+                    </option>
+
+                    <option value="Green">
+                        Green
+                    </option>
+
+                    <option value="Yellow">
+                        Yellow
+                    </option>
+
+                    <option value="Red">
+                        Red
+                    </option>
+
+                    <option value="Dark/Brown Spots">
+                        Dark/Brown Spots
+                    </option>
+
+                    <option value="Unusual Surface">
+                        Unusual Surface
+                    </option>
+
+                </select>
+
+
+                <label for="weight">
+                    Weight (grams)
+                </label>
+
+                <input
+                    type="number"
+                    id="weight"
+                    placeholder="Enter weight"
+                >
+
+
+                <label for="firmness">
+                    Firmness
+                </label>
+
+                <select id="firmness">
+
+                    <option value="">
+                        Select Firmness
+                    </option>
+
+                    <option value="High">
+                        High
+                    </option>
+
+                    <option value="Medium">
+                        Medium
+                    </option>
+
+                    <option value="Low">
+                        Low
+                    </option>
+
+                </select>
+
+
+                <label for="sugar">
+                    Sugar Level
+                </label>
+
+                <select id="sugar">
+
+                    <option value="">
+                        Select Sugar Level
+                    </option>
+
+                    <option value="High">
+                        High
+                    </option>
+
+                    <option value="Medium">
+                        Medium
+                    </option>
+
+                    <option value="Low">
+                        Low
+                    </option>
+
+                </select>
+
+
+                <label for="acidity">
+                    Acidity
+                </label>
+
+                <select id="acidity">
+
+                    <option value="">
+                        Select Acidity
+                    </option>
+
+                    <option value="High">
+                        High
+                    </option>
+
+                    <option value="Medium">
+                        Medium
+                    </option>
+
+                    <option value="Low">
+                        Low
+                    </option>
+
+                </select>
+
+            </div>
+
+        </div>
+
+
+        <!-- Check Button -->
+
+        <button
+            class="check-button"
+            onclick="checkQuality()"
+        >
+            CHECK QUALITY
+        </button>
+
+
+        <!-- Prediction Result -->
+
+        <div id="result" class="result-box">
+
+            <h3>Prediction</h3>
+
+            <p id="resultText">
+                Waiting for input...
+            </p>
+
+        </div>
+
+    </section>
+
+
+    <!-- About -->
+
+    <section id="about" class="about-section">
+
+        <h2>About FreshGuard AI</h2>
+
+        <p>
+            FreshGuard AI is an AI-based fruit and vegetable
+            quality checking system. It uses structured quality
+            information and images to classify produce.
+        </p>
+
+
+        <div class="categories">
+
+            <div>
+
+                <h3>Good to Eat</h3>
+
+                <p>
+                    Produce classified as good quality.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <h3>Bad to Eat</h3>
+
+                <p>
+                    Produce showing poor quality characteristics.
+                </p>
+
+            </div>
+
+
+            <div>
+
+                <h3>Artificial</h3>
+
+                <p>
+                    Produce classified as artificial based on
+                    learned examples.
+                </p>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- Footer -->
+
+    <footer>
+
+        <p>
+            © 2026 FreshGuard AI
+        </p>
+
+    </footer>
+
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+
+</html>

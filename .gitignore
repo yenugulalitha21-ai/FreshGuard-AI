@@ -1,0 +1,50 @@
+# Python & Virtual Environments
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Node & Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets (Never commit secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Preserve example environment templates
+!.env.example
+!frontend/.env.example
+
+# Datasets and raw data (bulk training sets)
+dataset/
+
+# Temporary uploads (clear runtime files)
+uploads/*
+!uploads/.gitkeep
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# IDEs & OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Ensure ML models are explicitly tracked for deployment
+!backend/model/FreshGuard_Good_Bad_MobileNetV2.keras
+!backend/model/freshguard_random_forest.pkl

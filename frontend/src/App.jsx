@@ -317,39 +317,42 @@ function App() {
       const formData = new FormData()
       formData.append('image', selectedFile)
 
+      console.log("Sending image to:", PREDICT_IMAGE_ENDPOINT)
+      console.log("Selected file:", selectedFile)
+      console.log("File type:", selectedFile?.type)
+      console.log("File size:", selectedFile?.size)
+      console.log("Starting prediction request...")
+
       const response = await fetch(PREDICT_IMAGE_ENDPOINT, {
         method: 'POST',
         body: formData,
         signal: controller.signal,
       })
 
-      let data = null
-      const rawText = await response.text()
+      console.log("Prediction response received:", response.status, response.statusText)
+
+      const responseText = await response.text()
+      console.log("Prediction response body:", responseText)
+
+      let result
       try {
-        data = JSON.parse(rawText)
-      } catch {
-        // Handle non-JSON responses such as 502/503/504 gateway errors
-        if (response.status === 502 || response.status === 503 || response.status === 504) {
-          throw new Error(`Server gateway error (${response.status}). The FreshGuard AI backend is waking up from cold start. Please wait a moment and try again.`)
-        }
-        if (!response.ok) {
-          throw new Error(`Server returned error status (${response.status}). The backend might still be spinning up.`)
-        }
-        throw new Error('Received non-JSON response from server.')
+        result = JSON.parse(responseText)
+      } catch (error) {
+        throw new Error(`Backend returned invalid JSON: ${responseText}`, { cause: error })
       }
 
       if (!response.ok) {
-        throw new Error(data?.error || data?.message || `Server returned error (${response.status})`)
+        throw new Error(result?.error || result?.message || `Server returned error (${response.status})`)
       }
 
-      if (!data || typeof data.prediction === 'undefined') {
+      if (!result || typeof result.prediction === 'undefined') {
         throw new Error('Invalid prediction format received from server.')
       }
 
-      const formattedConfidence = Number(data.confidence) || 0
+      const formattedConfidence = Number(result.confidence) || 0
 
       setImageResult({
-        prediction: data.prediction,
+        prediction: result.prediction,
         confidence: formattedConfidence,
       })
       setBackendOnline(true)
@@ -361,7 +364,7 @@ function App() {
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         analysisType: 'Image',
         fruit: 'Image Upload',
-        prediction: data.prediction,
+        prediction: result.prediction,
         confidence: formattedConfidence,
       }
       addToHistory(newRecord)
@@ -372,6 +375,7 @@ function App() {
         }
       }, 100)
     } catch (err) {
+      console.error("Prediction error:", err)
       if (err.name === 'AbortError') {
         setImageError('Request timed out. The Render server took longer than 90 seconds to respond. Please click Analyze Image again as the server finishes waking up.')
         setBackendOnline(false)

@@ -295,14 +295,14 @@ function App() {
 
     // Handle Render free-tier cold starts (informing user if backend is waking up)
     const coldStartTimer = setTimeout(() => {
-      setImageLoadingMessage('Waking up FreshGuard AI... This may take up to 60 seconds.')
+      setImageLoadingMessage('Waking up FreshGuard AI... Please wait. The first prediction may take up to 4 minutes.')
     }, 5000)
 
-    // Prevent hanging indefinitely with a 120s AbortController
+    // Prevent hanging indefinitely with a 240s AbortController
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
       controller.abort()
-    }, 120000)
+    }, 240000)
 
     try {
       const formData = new FormData()
@@ -375,7 +375,7 @@ function App() {
     } catch (err) {
       console.error("Prediction error:", err)
       if (err.name === 'AbortError') {
-        setImageError('Request timed out. The Render server took longer than 120 seconds to respond. Please click Analyze Image again as the server finishes waking up.')
+        setImageError('FreshGuard AI is taking too long to respond. Please try Analyze Image again.')
         setBackendStatus('unavailable')
       } else if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
         setImageError('Unable to connect to FreshGuard AI backend at Render. The server may still be spinning up. Please wait a moment and try again.')

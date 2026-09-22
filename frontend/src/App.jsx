@@ -4,7 +4,7 @@ import Login from './components/Login'
 import History from './components/History'
 import Profile from './components/Profile'
 
-const BACKEND_URL = (import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000').replace(/\/+$/, '')
+const BACKEND_URL = (import.meta.env.VITE_API_URL || 'https://freshguard-ai-4gbv.onrender.com').replace(/\/+$/, '')
 const PREDICT_IMAGE_ENDPOINT = `${BACKEND_URL}/predict`
 const PREDICT_MANUAL_ENDPOINT = `${BACKEND_URL}/predict-manual`
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
@@ -96,6 +96,7 @@ function App() {
   const [selectedFile, setSelectedFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
   const [imageLoading, setImageLoading] = useState(false)
+  const [imageLoadingMessage, setImageLoadingMessage] = useState('')
   const [imageResult, setImageResult] = useState(null)
   const [imageError, setImageError] = useState(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -189,11 +190,28 @@ function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // Check backend server availability
+  // Check backend server availability with cold-start retry
   useEffect(() => {
-    fetch(BACKEND_URL)
-      .then((res) => setBackendOnline(res.ok))
-      .catch(() => setBackendOnline(false))
+    let timerId = null
+    const checkBackend = () => {
+      fetch(BACKEND_URL)
+        .then((res) => {
+          if (res.ok) {
+            setBackendOnline(true)
+          } else {
+            setBackendOnline(false)
+            timerId = setTimeout(checkBackend, 10000)
+          }
+        })
+        .catch(() => {
+          setBackendOnline(false)
+          timerId = setTimeout(checkBackend, 10000)
+        })
+    }
+    checkBackend()
+    return () => {
+      if (timerId) clearTimeout(timerId)
+    }
   }, [])
 
   // Clean up object URLs when preview changes or unmounts
@@ -280,8 +298,20 @@ function App() {
     }
 
     setImageLoading(true)
+    setImageLoadingMessage('Analyzing image...')
     setImageError(null)
     setImageResult(null)
+
+    // Handle Render free-tier cold starts (informing user if backend is waking up)
+    const coldStartTimer = setTimeout(() => {
+      setImageLoadingMessage('Waking up FreshGuard AI... This may take up to 60 seconds.')
+    }, 5000)
+
+    // Prevent hanging indefinitely with a 90s AbortController
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => {
+      controller.abort()
+    }, 90000)
 
     try {
       const formData = new FormData()
@@ -290,15 +320,38 @@ function App() {
       const response = await fetch(PREDICT_IMAGE_ENDPOINT, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       })
 
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || `Server returned error (${response.status})`)
+      let data = null
+      const rawText = await response.text()
+      try {
+        data = JSON.parse(rawText)
+      } catch {
+        // Handle non-JSON responses such as 502/503/504 gateway errors
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+          throw new Error(`Server gateway error (${response.status}). The FreshGuard AI backend is waking up from cold start. Please wait a moment and try again.`)
+        }
+        if (!response.ok) {
+          throw new Error(`Server returned error status (${response.status}). The backend might still be spinning up.`)
+        }
+        throw new Error('Received non-JSON response from server.')
       }
 
-      setImageResult(data)
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || `Server returned error (${response.status})`)
+      }
+
+      if (!data || typeof data.prediction === 'undefined') {
+        throw new Error('Invalid prediction format received from server.')
+      }
+
+      const formattedConfidence = Number(data.confidence) || 0
+
+      setImageResult({
+        prediction: data.prediction,
+        confidence: formattedConfidence,
+      })
       setBackendOnline(true)
 
       // Automatically add successful result to logged-in user's history
@@ -309,7 +362,7 @@ function App() {
         analysisType: 'Image',
         fruit: 'Image Upload',
         prediction: data.prediction,
-        confidence: Number(data.confidence)
+        confidence: formattedConfidence,
       }
       addToHistory(newRecord)
 
@@ -319,14 +372,20 @@ function App() {
         }
       }, 100)
     } catch (err) {
-      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-        setImageError('Unable to connect to FreshGuard AI. Please make sure the backend is running.')
+      if (err.name === 'AbortError') {
+        setImageError('Request timed out. The Render server took longer than 90 seconds to respond. Please click Analyze Image again as the server finishes waking up.')
+        setBackendOnline(false)
+      } else if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+        setImageError('Unable to connect to FreshGuard AI backend at Render. The server may still be spinning up. Please wait a moment and try again.')
         setBackendOnline(false)
       } else {
         setImageError(err.message || 'Prediction failed. Please try again with another image.')
       }
     } finally {
+      clearTimeout(coldStartTimer)
+      clearTimeout(timeoutId)
       setImageLoading(false)
+      setImageLoadingMessage('')
     }
   }
 
@@ -802,7 +861,7 @@ function App() {
                       {imageLoading ? (
                         <>
                           <span className="spinner" aria-hidden="true"></span>
-                          Analyzing your image...
+                          {imageLoadingMessage || 'Analyzing image...'}
                         </>
                       ) : (
                         <>

@@ -1,4 +1,11 @@
 import os
+
+# Configure single-threaded CPU execution for TensorFlow before importing to prevent thread explosion & RAM thrashing on Render
+os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
+os.environ["TF_NUM_INTEROP_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+
 import math
 import numpy as np
 import pandas as pd
@@ -6,6 +13,11 @@ from PIL import Image
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tensorflow as tf
+
+# Limit TensorFlow CPU parallelism
+tf.config.threading.set_intra_op_parallelism_threads(1)
+tf.config.threading.set_inter_op_parallelism_threads(1)
+
 import joblib
 from werkzeug.utils import secure_filename
 
@@ -42,6 +54,14 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 print(f"Loading FreshGuard AI Image model from: {IMAGE_MODEL_PATH}")
 image_model = tf.keras.models.load_model(IMAGE_MODEL_PATH)
 print("Image model loaded successfully!")
+
+# Warm up image model at startup to eliminate first-request graph compilation latency
+try:
+    dummy_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
+    _ = image_model(dummy_input, training=False)
+    print("FreshGuard AI Image model warmed up successfully!")
+except Exception as e:
+    print(f"Image model warmup notice: {e}")
 
 print(f"Loading FreshGuard AI Random Forest model from: {RF_MODEL_PATH}")
 rf_model = joblib.load(RF_MODEL_PATH)
@@ -145,7 +165,8 @@ def predict():
         img_array = np.array(image, dtype=np.float32)
         img_array = np.expand_dims(img_array, axis=0)
 
-        raw_prediction = image_model.predict(img_array)
+        # Direct inference call avoids Keras batching generator overhead and excess thread allocation
+        raw_prediction = image_model(img_array, training=False)
         score = float(raw_prediction[0][0])
 
         if score >= 0.5:

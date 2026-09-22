@@ -45,9 +45,9 @@ This guide outlines the production deployment setup and steps for the **FreshGua
   ```
 - **Start Command (Production WSGI)**:
   ```bash
-  gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 2 --timeout 180
+  gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 1 --timeout 180
   ```
-  *(Note: A timeout of 180 seconds and 1 worker allows TensorFlow to operate within 512MB RAM without memory contention).*
+  *(Note: A timeout of 180 seconds and 1 worker with 1 thread allows TensorFlow to operate within 512MB RAM without memory contention).*
 
 ### Environment Variables
 | Variable | Required | Default | Description |

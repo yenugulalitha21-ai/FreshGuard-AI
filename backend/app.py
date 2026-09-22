@@ -1,11 +1,15 @@
 import os
 
-# Configure single-threaded CPU execution for TensorFlow before importing to prevent thread explosion & RAM thrashing on Render
+# Configure single-threaded CPU-only execution for TensorFlow before importing
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["TF_NUM_INTRAOP_THREADS"] = "1"
 os.environ["TF_NUM_INTEROP_THREADS"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
+os.environ["MALLOC_TRIM_THRESHOLD_"] = "65536"
 
+import gc
 import math
 import numpy as np
 import pandas as pd
@@ -20,6 +24,24 @@ tf.config.threading.set_inter_op_parallelism_threads(1)
 
 import joblib
 from werkzeug.utils import secure_filename
+
+# Helper for Linux memory trim to prevent cgroup OOM on Render 512MB RAM
+try:
+    import ctypes
+    _libc = ctypes.CDLL("libc.so.6")
+except Exception:
+    _libc = None
+
+
+def trim_memory():
+    """Forces Python garbage collection and trims glibc heap back to OS."""
+    gc.collect()
+    if _libc and hasattr(_libc, 'malloc_trim'):
+        try:
+            _libc.malloc_trim(0)
+        except Exception:
+            pass
+
 
 # 1. Initialize Flask app and configure CORS
 app = Flask(__name__)
@@ -55,17 +77,23 @@ print(f"Loading FreshGuard AI Image model from: {IMAGE_MODEL_PATH}")
 image_model = tf.keras.models.load_model(IMAGE_MODEL_PATH)
 print("Image model loaded successfully!")
 
-# Warm up image model at startup to eliminate first-request graph compilation latency
-try:
-    dummy_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
-    _ = image_model(dummy_input, training=False)
-    print("FreshGuard AI Image model warmed up successfully!")
-except Exception as e:
-    print(f"Image model warmup notice: {e}")
+# Warm up image model at startup inside a function; free temporary tensors immediately
+def _warmup_model():
+    try:
+        dummy_input = np.zeros((1, 224, 224, 3), dtype=np.float32)
+        _ = image_model(dummy_input, training=False)
+        del dummy_input, _
+        trim_memory()
+        print("FreshGuard AI Image model warmed up successfully!")
+    except Exception as e:
+        print(f"Image model warmup notice: {e}")
+
+_warmup_model()
 
 print(f"Loading FreshGuard AI Random Forest model from: {RF_MODEL_PATH}")
 rf_model = joblib.load(RF_MODEL_PATH)
 print("Random Forest model loaded successfully!")
+trim_memory()
 
 # Image model parameters
 IMAGE_SIZE = (224, 224)
@@ -159,15 +187,20 @@ def predict():
     file.save(filepath)
 
     try:
-        image = Image.open(filepath)
-        image = image.convert('RGB')
-        image = image.resize(IMAGE_SIZE)
-        img_array = np.array(image, dtype=np.float32)
-        img_array = np.expand_dims(img_array, axis=0)
+        # Load and resize image safely; release PIL resources immediately
+        with Image.open(filepath) as img:
+            img_rgb = img.convert('RGB')
+            img_resized = img_rgb.resize(IMAGE_SIZE, Image.Resampling.BILINEAR)
+            img_array = np.expand_dims(np.asarray(img_resized, dtype=np.float32), axis=0)
+            del img_rgb, img_resized
 
-        # Direct inference call avoids Keras batching generator overhead and excess thread allocation
+        # Direct synchronous inference call avoiding Keras batching generator overhead
         raw_prediction = image_model(img_array, training=False)
-        score = float(raw_prediction[0][0])
+        score = float(raw_prediction.numpy()[0][0])
+
+        # Release intermediate array and tensor references immediately
+        del img_array, raw_prediction
+        trim_memory()
 
         if score >= 0.5:
             prediction_label = "Good to Eat"
@@ -192,6 +225,7 @@ def predict():
                 os.remove(filepath)
             except OSError:
                 pass
+        trim_memory()
 
 
 @app.route('/predict-manual', methods=['POST'])

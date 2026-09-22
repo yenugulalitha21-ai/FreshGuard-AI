@@ -307,11 +307,11 @@ function App() {
       setImageLoadingMessage('Waking up FreshGuard AI... This may take up to 60 seconds.')
     }, 5000)
 
-    // Prevent hanging indefinitely with a 90s AbortController
+    // Prevent hanging indefinitely with a 120s AbortController
     const controller = new AbortController()
     const timeoutId = setTimeout(() => {
       controller.abort()
-    }, 90000)
+    }, 120000)
 
     try {
       const formData = new FormData()
@@ -351,6 +351,13 @@ function App() {
 
       const formattedConfidence = Number(result.confidence) || 0
 
+      // Immediately clear loading indicators
+      setImageLoading(false)
+      setImageLoadingMessage('')
+      clearTimeout(coldStartTimer)
+      clearTimeout(timeoutId)
+
+      // Store prediction and confidence in state
       setImageResult({
         prediction: result.prediction,
         confidence: formattedConfidence,
@@ -377,7 +384,7 @@ function App() {
     } catch (err) {
       console.error("Prediction error:", err)
       if (err.name === 'AbortError') {
-        setImageError('Request timed out. The Render server took longer than 90 seconds to respond. Please click Analyze Image again as the server finishes waking up.')
+        setImageError('Request timed out. The Render server took longer than 120 seconds to respond. Please click Analyze Image again as the server finishes waking up.')
         setBackendOnline(false)
       } else if (err.message && (err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
         setImageError('Unable to connect to FreshGuard AI backend at Render. The server may still be spinning up. Please wait a moment and try again.')
@@ -854,7 +861,7 @@ function App() {
                 )}
 
                 {/* Action Button */}
-                {previewUrl && !imageResult && (
+                {previewUrl && (
                   <div className="action-area">
                     <button
                       type="button"
@@ -881,7 +888,7 @@ function App() {
                 )}
 
                 {/* Image Result Card */}
-                {imageResult && (
+                {imageResult && !imageLoading && (
                   <div
                     ref={imageResultRef}
                     className={`result-card ${isImagePositive ? 'positive' : 'warning'}`}
